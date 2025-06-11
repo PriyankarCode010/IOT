@@ -1,11 +1,10 @@
-// app/api/reply/route.js
 import { NextResponse } from 'next/server';
 import { prisma } from '../../lib/prisma';
 
 export async function GET() {
   try {
     const latestReply = await prisma.reply.findFirst({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },  // ✅ fixed
     });
 
     return NextResponse.json({
@@ -25,6 +24,7 @@ export async function POST(req) {
     const saved = await prisma.reply.create({
       data: {
         message,
+        timestamp: new Date(),  // optional, Prisma defaults to now()
       },
     });
 
