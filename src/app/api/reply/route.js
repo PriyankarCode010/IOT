@@ -4,11 +4,12 @@ import { prisma } from '../../lib/prisma';
 export async function GET() {
   try {
     const latestReply = await prisma.reply.findFirst({
-      orderBy: { timestamp: 'desc' },  // ✅ fixed
+      orderBy: { timestamp: 'desc' },
     });
 
     return NextResponse.json({
       message: latestReply?.message || 'No message yet',
+      id: latestReply?.id?.toString() || null, // Convert ObjectId to string for safety
     });
   } catch (err) {
     console.error('GET /api/reply error:', err);
