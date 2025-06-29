@@ -1,37 +1,35 @@
 "use client"
-import { useEffect, useState } from "react"
-import { Heart, Send } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Send } from "lucide-react"
 
-export default function RomanticChatInterface() {
+export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState("")
+  const messagesEndRef = useRef(null)
 
   // Fetch messages every 5 seconds
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const res = await fetch("/api/log")
-        const logs = await res.json()
-        const replyRes = await fetch("/api/reply")
-        const replyData = await replyRes.json()
-
-        const formatted = logs.map((log) => ({
-          type: "received", // Messages from her
+        const [logRes, replyRes] = await Promise.all([
+          fetch("/api/log"),
+          fetch("/api/reply/all")
+        ])
+        const logs = await logRes.json()
+        const replies = await replyRes.json()
+        const herMessages = logs.map((log) => ({
+          type: "received",
           message: log.message,
           timestamp: new Date(log.timestamp),
         }))
-
-        if (replyData.message && replyData.message !== "No message yet") {
-          formatted.push({
-            type: "sent", // Messages from me
-            message: replyData.message,
-            timestamp: new Date(),
-          })
-        }
-
-        // Sort all messages chronologically
-        formatted.sort((a, b) => a.timestamp - b.timestamp)
-        setMessages(formatted)
+        const myMessages = replies.map((reply) => ({
+          type: "sent",
+          message: reply.message,
+          timestamp: new Date(reply.timestamp),
+        }))
+        const merged = [...herMessages, ...myMessages]
+        merged.sort((a, b) => a.timestamp - b.timestamp)
+        setMessages(merged)
       } catch (error) {
         console.error("Error fetching messages:", error)
       }
@@ -41,6 +39,10 @@ export default function RomanticChatInterface() {
     const interval = setInterval(fetchMessages, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
   const sendReply = async () => {
     if (!input.trim()) return
@@ -63,94 +65,72 @@ export default function RomanticChatInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-rose-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-pink-200/50 overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-pink-100">
+      <div className="w-full max-w-md h-[90vh] flex flex-col rounded-3xl shadow-2xl border border-gray-100 bg-white/70 backdrop-blur-md overflow-hidden relative">
         {/* Header */}
-        <div className="bg-gradient-to-r from-pink-400 to-rose-400 p-6 text-center relative">
-          <div className="absolute inset-0 bg-white/10"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Heart className="w-6 h-6 text-white fill-white animate-pulse" />
-              <h2 className="text-2xl font-bold text-white">Our Chat</h2>
-              <Heart className="w-6 h-6 text-white fill-white animate-pulse" />
-            </div>
-            <p className="text-pink-100 text-sm">Where we connect 💕</p>
-          </div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white/60">
+          <span className="font-bold text-lg tracking-tight text-gray-800">Her</span>
+          <span className="flex items-center gap-2 text-xs text-green-500">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+            Online
+          </span>
         </div>
-
-        {/* Messages Container */}
-        <div className="h-96 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-white/50 to-pink-50/30">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-3 bg-gradient-to-b from-white/60 to-pink-50/40">
           {messages.length === 0 ? (
-            <div className="text-center text-gray-500 mt-20">
-              <Heart className="w-12 h-12 mx-auto mb-4 text-pink-300" />
-              <p className="text-lg">Start your conversation...</p>
-            </div>
+            <div className="text-center text-gray-400 mt-20 text-base">No messages yet. Start the conversation!</div>
           ) : (
-            messages.map((msg, index) => (
-              <div key={index} className={`flex ${msg.type === "sent" ? "justify-end" : "justify-start"}`}>
+            messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.type === "sent" ? "justify-end" : "justify-start"}`}
+              >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-lg relative ${
+                  className={`px-4 py-2 rounded-2xl shadow-md max-w-[75%] transition-all duration-300 opacity-90 ${
                     msg.type === "sent"
-                      ? "bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-br-md"
-                      : "bg-gradient-to-r from-pink-400 to-rose-400 text-white rounded-bl-md"
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-400 text-white"
+                      : "bg-gradient-to-r from-pink-400 to-rose-400 text-white"
                   }`}
+                  style={{animation: 'fadeIn 0.4s'}}
                 >
-                  {/* Message bubble tail */}
-                  <div
-                    className={`absolute top-4 w-3 h-3 transform rotate-45 ${
-                      msg.type === "sent" ? "bg-blue-500 -right-1" : "bg-pink-400 -left-1"
-                    }`}
-                  ></div>
-
-                  <p className="text-sm leading-relaxed font-medium">{msg.message}</p>
-                  <span className="block text-xs opacity-75 mt-2">
-                    {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </span>
+                  <div className="text-sm font-medium break-words">{msg.message}</div>
+                  <div className={`text-[10px] mt-1 opacity-70 ${msg.type === "sent" ? "text-right" : "text-left"}`}>
+                    {msg.timestamp && !isNaN(msg.timestamp.getTime())
+                      ? msg.timestamp.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : ''}
+                  </div>
                 </div>
               </div>
             ))
           )}
+          <div ref={messagesEndRef} />
         </div>
-
-        {/* Input Area */}
-        <div className="p-4 bg-white/70 backdrop-blur-sm border-t border-pink-200/50">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your loving message..."
-                className="w-full px-4 py-3 pr-12 rounded-full border-2 border-pink-200 focus:border-pink-400 focus:outline-none bg-white/80 placeholder-pink-300 text-gray-700 transition-all duration-200"
-              />
-              <Heart className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-pink-300" />
-            </div>
+        {/* Input */}
+        <div className="px-4 py-3 bg-white/80 backdrop-blur-md border-t border-gray-100">
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type a message…"
+              className="flex-1 px-4 py-2 rounded-full border border-gray-200 bg-white/70 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-gray-700 placeholder-gray-400 shadow-sm"
+            />
             <button
               onClick={sendReply}
               disabled={!input.trim()}
-              className="bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 disabled:from-gray-300 disabled:to-gray-400 text-white p-3 rounded-full shadow-lg transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
+              className="p-2 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed transition"
             >
               <Send className="w-5 h-5" />
             </button>
           </div>
         </div>
-
-        {/* Floating hearts decoration */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <Heart
-            className="absolute top-20 left-8 w-4 h-4 text-pink-200 animate-bounce"
-            style={{ animationDelay: "0s" }}
-          />
-          <Heart
-            className="absolute top-32 right-12 w-3 h-3 text-rose-200 animate-bounce"
-            style={{ animationDelay: "1s" }}
-          />
-          <Heart
-            className="absolute bottom-32 left-16 w-5 h-5 text-pink-200 animate-bounce"
-            style={{ animationDelay: "2s" }}
-          />
-        </div>
+        <style jsx global>{`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
       </div>
     </div>
   )
